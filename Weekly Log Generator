@@ -1,0 +1,86 @@
+function generateWeeklyLog() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheets = ss.getSheets();
+  const logSheet = ss.getSheetByName("Weekly Log");
+
+  if (!logSheet) return;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  let targetSheet = null;
+  let targetDate = null;
+
+  // Find latest valid (non-future) rota sheet
+  sheets.forEach(sheet => {
+    const name = sheet.getName();
+
+    // Only date sheets like 1.5.26
+    if (!/^\d{1,2}\.\d{1,2}\.\d{2}$/.test(name)) return;
+
+    const parts = name.split(".");
+    const sheetDate = new Date(`20${parts[2]}`, parts[1] - 1, parts[0]);
+    sheetDate.setHours(0, 0, 0, 0);
+
+    // ignore future sheets
+    if (sheetDate > today) return;
+
+    // pick newest valid sheet
+    if (!targetDate || sheetDate > targetDate) {
+      targetDate = sheetDate;
+      targetSheet = sheet;
+    }
+  });
+
+  if (!targetSheet) {
+    Logger.log("No valid rota sheet found");
+    return;
+  }
+
+  const data = targetSheet.getDataRange().getValues();
+  const counts = {};
+
+  // Count valid IDs only
+  for (let r = 3; r < data.length; r++) {
+    for (let c = 1; c < data[r].length; c++) {
+
+      const cell = data[r][c];
+      if (!cell) continue;
+
+      const ids = cell
+        .toString()
+        .split(",")
+        .map(s => s.trim())
+        .filter(s => s);
+
+      ids.forEach(id => {
+        const cleanId = id.trim();
+
+        // Only allow real IDs like "Name – 2020"
+        if (!/^[A-Za-z ]+ [-–] \d{4}$/.test(cleanId)) return;
+
+        counts[cleanId] = (counts[cleanId] || 0) + 1;
+      });
+    }
+  }
+
+  //  OUTPUT (database style append)
+  const output = Object.keys(counts).map(id => [
+    targetSheet.getName(), // Week
+    id,                    // Display ID
+    counts[id]             // Shifts
+  ]);
+
+  if (output.length > 0) {
+    const startRow = logSheet.getLastRow() + 1;
+
+    logSheet.getRange(
+      startRow,
+      1,
+      output.length,
+      3
+    ).setValues(output);
+  }
+
+  Logger.log("Used sheet: " + targetSheet.getName());
+}

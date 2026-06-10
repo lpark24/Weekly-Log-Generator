@@ -1,0 +1,1 @@
+Google Apps Script for automatically generating weekly volunteer shift logs from rota sheets. The script identifies the most recent rota week, counts volunteer shifts based on unique volunteer IDs, and appends results to a Weekly Log sheet.
